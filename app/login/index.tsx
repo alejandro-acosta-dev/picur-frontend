@@ -1,5 +1,6 @@
 import { router } from "expo-router";
-import { Pressable, StyleSheet, Text, TextInput, View } from "react-native";
+import { StyleSheet, Text, TextInput, View } from "react-native";
+import Button from "../components/button";
 
 export default function LoginScreen() {
   return (
@@ -19,12 +20,10 @@ export default function LoginScreen() {
         placeholderTextColor="#666"
       />
 
-      <Pressable
-        style={styles.button}
+      <Button
+        title="Iniciar sesión"
         onPress={() => router.replace("/(tabs)")}
-      >
-        <Text style={styles.buttonText}>Iniciar sesión</Text>
-      </Pressable>
+      />
     </View>
   );
 }
