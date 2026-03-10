@@ -1,22 +1,5 @@
-import { StyleSheet, Text, View } from "react-native";
+import { Redirect } from "expo-router";
 
-export default function HomeScreen() {
-  return (
-    <View style={styles.container}>
-      <Text style={styles.title}>PICUR - Monitor de Cadena de Frío</Text>
-    </View>
-  );
+export default function Index() {
+  return <Redirect href="/login" />;
 }
-
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    justifyContent: "center",
-    alignItems: "center",
-    backgroundColor: "white",
-  },
-  title: {
-    fontSize: 24,
-    color: "black",
-  },
-});
