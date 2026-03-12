@@ -1,29 +1,36 @@
 import { router } from "expo-router";
-import { StyleSheet, Text, TextInput, View } from "react-native";
-import Button from "../components/button";
+import { Image, Pressable, StyleSheet, Text, View } from "react-native";
+import Button from "../components/Button";
+import Input from "../components/Input";
 
 export default function LoginScreen() {
   return (
     <View style={styles.container}>
-      <Text style={styles.title}>Login PICUR</Text>
+      <View style={styles.content}>
+        <Image
+          source={require("../../assets/images/Logo2.png")}
+          style={styles.logo}
+        />
 
-      <TextInput
-        placeholder="Correo electrónico"
-        style={styles.input}
-        placeholderTextColor="#666"
-      />
+        <Text style={styles.title}>FrigoSafe</Text>
 
-      <TextInput
-        placeholder="Contraseña"
-        secureTextEntry
-        style={styles.input}
-        placeholderTextColor="#666"
-      />
+        <Text style={styles.subtitle}>Monitoreo Inteligente de Vacunas</Text>
 
-      <Button
-        title="Iniciar sesión"
-        onPress={() => router.replace("/(tabs)")}
-      />
+        <View style={styles.form}>
+          <Input placeholder="Correo electrónico" />
+
+          <Input placeholder="Contraseña" secureTextEntry />
+
+          <Button
+            title="Iniciar sesión"
+            onPress={() => router.replace("/(tabs)")}
+          />
+
+          <Pressable onPress={() => router.push("/recover-password")}>
+            <Text style={styles.forgot}>¿Olvidaste tu contraseña?</Text>
+          </Pressable>
+        </View>
+      </View>
     </View>
   );
 }
@@ -31,41 +38,49 @@ export default function LoginScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
+    backgroundColor: "#0a0a0a",
     justifyContent: "center",
     alignItems: "center",
-    backgroundColor: "black",
-  },
-  title: {
-    fontSize: 24,
-    marginBottom: 10,
-    color: "white",
-  },
-  text: {
-    color: "white",
-  },
-  input: {
-    width: "80%",
-    height: 45,
-    borderWidth: 1,
-    borderColor: "#ccc",
-    borderRadius: 8,
-    paddingHorizontal: 10,
-    marginBottom: 10,
-    backgroundColor: "white",
-  },
-  button: {
-    width: "80%",
-    height: 45,
-    backgroundColor: "#007AFF",
-    justifyContent: "center",
-    alignItems: "center",
-    borderRadius: 8,
-    marginTop: 10,
+    padding: 24,
   },
 
-  buttonText: {
-    color: "white",
-    fontSize: 16,
+  content: {
+    width: "100%",
+    maxWidth: 420,
+    alignItems: "center",
+  },
+
+  logo: {
+    width: 150,
+    height: 150,
+    resizeMode: "contain",
+    marginBottom: 15,
+  },
+
+  title: {
+    fontSize: 34,
     fontWeight: "bold",
+    color: "white",
+  },
+
+  subtitle: {
+    fontSize: 14,
+    color: "#9ca3af",
+    marginTop: 5,
+    marginBottom: 35,
+    textAlign: "center",
+  },
+
+  form: {
+    width: "100%",
+    gap: 18,
+  },
+
+  forgot: {
+    marginTop: 8,
+    textAlign: "center",
+    color: "#3b82f6",
+    fontSize: 14,
+    fontWeight: "500",
   },
 });

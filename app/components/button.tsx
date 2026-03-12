@@ -15,10 +15,13 @@ export default function Button({ title, onPress }: Props) {
 
 const styles = StyleSheet.create({
   button: {
+    width: "100%",
+    height: 55,
     backgroundColor: "#2563eb",
     padding: 15,
     borderRadius: 10,
     alignItems: "center",
+    justifyContent: "center",
     marginTop: 20,
   },
   text: {
