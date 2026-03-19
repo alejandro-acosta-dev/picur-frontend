@@ -53,6 +53,10 @@ export default function LoginScreen() {
           <Pressable onPress={() => router.push("/recover-password")}>
             <Text style={styles.forgot}>¿Olvidaste tu contraseña?</Text>
           </Pressable>
+
+          <Pressable onPress={() => router.push("/register")}>
+            <Text style={styles.register}>¿No tienes cuenta? <Text style={styles.link}>Crear cuenta</Text></Text>
+          </Pressable>
         </View>
       </View>
     </View>
@@ -66,8 +70,8 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     alignItems: "center",
     padding: 24,
-    marginBottom: 200,
-    // marginBottom: 100,
+    // marginBottom: 200,
+    marginBottom: 100,
   },
 
   content: {
@@ -115,5 +119,16 @@ const styles = StyleSheet.create({
   marginTop: 5,
   fontSize: 13,
   fontWeight: "500",
+  },
+  register: {
+  marginTop: 15,
+  textAlign: "center",
+  color: "#9ca3af",
+  fontSize: 14,
+},
+
+link: {
+  color: "#3b82f6",
+  fontWeight: "600",
 },
 });

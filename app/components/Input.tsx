@@ -5,6 +5,9 @@ type Props = {
   secureTextEntry?: boolean;
   value?: string;
   onChangeText?: (text: string) => void;
+  style?: any;
+  keyboardType?: any;
+  onFocus?: () => void;
 };
 
 export default function Input({
@@ -12,15 +15,20 @@ export default function Input({
   secureTextEntry,
   value,
   onChangeText,
+  style,
+  keyboardType,
+  onFocus,
 }: Props) {
   return (
     <TextInput
-      style={styles.input}
+      style={[styles.input, style]}
       placeholder={placeholder}
       placeholderTextColor="#666"
       secureTextEntry={secureTextEntry}
       value={value}
       onChangeText={onChangeText}
+      keyboardType={keyboardType}
+      onFocus={onFocus}
     />
   );
 }
