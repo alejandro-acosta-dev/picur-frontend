@@ -1,10 +1,14 @@
-import { router } from "expo-router";
+import { updatePassword } from "@/services/user.service";
+import { GetNotification } from "@/utils/notification";
+import { router, useLocalSearchParams } from "expo-router";
 import { useState } from "react";
 import { StyleSheet, Text, TouchableOpacity, View } from "react-native";
 import Button from "./components/Button";
 import Input from "./components/Input";
 
 export default function NewPasswordScreen() {
+  const { userId } = useLocalSearchParams();
+
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [error, setError] = useState("");
@@ -15,7 +19,7 @@ export default function NewPasswordScreen() {
     return regex.test(password);
   };
 
-  const handleChangePassword = () => {
+  const handleChangePassword = async () => {
     if (!isValidPassword(password)) {
       setError(
         "La contraseña debe tener mínimo 8 caracteres, una letra y un número",
@@ -30,26 +34,36 @@ export default function NewPasswordScreen() {
 
     setError("");
 
-    router.replace("/login");
+    //Update password in backend
+    let response = await updatePassword(userId as string, password);
+    
+    if(response.ok){
+      GetNotification("Contraseña cambiada exitosamente");
+      router.replace("/login");
+    }else{
+       GetNotification("Error al cambiar la contraseña");
+    }
   };
 
   return (
     <View style={styles.container}>
       <Text style={styles.title}>Nueva contraseña</Text>
 
+      
       <Input
         placeholder="Nueva contraseña"
         secureTextEntry={!showPassword}
         value={password}
         onChangeText={setPassword}
       />
-
+      
       <Input
         placeholder="Confirmar contraseña"
         secureTextEntry={!showPassword}
         value={confirmPassword}
         onChangeText={setConfirmPassword}
       />
+      
 
       <TouchableOpacity onPress={() => setShowPassword(!showPassword)}>
         <Text style={styles.showPassword}>
@@ -71,6 +85,8 @@ const styles = StyleSheet.create({
     alignItems: "center",
     backgroundColor: "black",
     padding: 20,
+    marginBottom: 100,
+    gap: 10,
   },
 
   title: {

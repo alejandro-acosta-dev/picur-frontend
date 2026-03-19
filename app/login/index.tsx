@@ -1,9 +1,26 @@
 import { router } from "expo-router";
+import { useState } from "react";
 import { Image, Pressable, StyleSheet, Text, View } from "react-native";
+import { login } from "../../services/login.service";
 import Button from "../components/Button";
 import Input from "../components/Input";
 
 export default function LoginScreen() {
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [error, setError] = useState("");
+
+  const handleLogin = async () => {
+    let response = await login(email, password);
+    if (response.success) {
+      router.push("/home");
+    } else {
+      setError("Correo electrónico o contraseña incorrectos");
+      // setEmail("");
+      setPassword("");
+    }
+  };
+
   return (
     <View style={styles.container}>
       <View style={styles.content}>
@@ -13,18 +30,25 @@ export default function LoginScreen() {
         />
 
         <Text style={styles.title}>FrigoSafe</Text>
-
         <Text style={styles.subtitle}>Monitoreo Inteligente de Vacunas</Text>
 
         <View style={styles.form}>
-          <Input placeholder="Correo electrónico" />
-
-          <Input placeholder="Contraseña" secureTextEntry />
-
-          <Button
-            title="Iniciar sesión"
-            onPress={() => router.replace("/(tabs)")}
+          <Input
+            placeholder="Correo electrónico"
+            value={email}
+            onChangeText={setEmail}
           />
+
+          <Input
+            placeholder="Contraseña"
+            secureTextEntry
+            value={password}
+            onChangeText={setPassword}
+          />
+
+          <Button title="Iniciar sesión" onPress={handleLogin} />
+
+          {error ? <Text style={styles.error}>{error}</Text> : null}
 
           <Pressable onPress={() => router.push("/recover-password")}>
             <Text style={styles.forgot}>¿Olvidaste tu contraseña?</Text>
@@ -42,6 +66,8 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     alignItems: "center",
     padding: 24,
+    marginBottom: 200,
+    // marginBottom: 100,
   },
 
   content: {
@@ -83,4 +109,11 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: "500",
   },
+  error: {
+  color: "#ef4444", // rojo tipo Tailwind
+  textAlign: "center",
+  marginTop: 5,
+  fontSize: 13,
+  fontWeight: "500",
+},
 });

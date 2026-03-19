@@ -1,11 +1,14 @@
-import { router } from "expo-router";
+import { GetNotification } from "@/utils/notification";
+import { router, useLocalSearchParams } from "expo-router";
 import { useRef, useState } from "react";
 import { StyleSheet, Text, TextInput, View } from "react-native";
 
 export default function VerifyCodeScreen() {
+  const { code, userId } = useLocalSearchParams();
+
   const [otp, setOtp] = useState(["", "", "", "", "", ""]);
   const inputs = useRef<(TextInput | null)[]>([]);
-  const handleChange = (value: string, index: number) => {
+  const handleChange = async (value: string, index: number) => {
     const newOtp = [...otp];
     newOtp[index] = value;
     setOtp(newOtp);
@@ -15,7 +18,16 @@ export default function VerifyCodeScreen() {
     }
 
     if (newOtp.every((digit) => digit !== "")) {
-      router.push("/new-password");
+      if (Number(newOtp.join("")) === Number(code)) {
+        router.push({
+          pathname: "/new-password",
+          params: {
+            userId
+          },
+        });
+      } else {
+        GetNotification("El código ingresado es incorrecto");
+      }
     }
   };
 
