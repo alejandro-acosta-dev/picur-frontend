@@ -1,12 +1,14 @@
+import { createUser } from "@/services/user.service";
+import { GetNotification } from "@/utils/notification";
 import { router } from "expo-router";
 import { useRef, useState } from "react";
 import {
-    KeyboardAvoidingView,
-    Platform,
-    ScrollView,
-    StyleSheet,
-    Text,
-    View,
+  KeyboardAvoidingView,
+  Platform,
+  ScrollView,
+  StyleSheet,
+  Text,
+  View,
 } from "react-native";
 import Button from "./components/Button";
 import Input from "./components/Input";
@@ -25,7 +27,7 @@ export default function RegisterScreen() {
     scrollRef.current?.scrollTo({ y: 250, animated: true });
   };
 
-  const handleRegister = () => {
+  const handleRegister = async () => {
     if (
       !name.trim() ||
       !email.trim() ||
@@ -65,7 +67,15 @@ export default function RegisterScreen() {
     }
 
     setError("");
-    router.replace("/login");
+    let response = await createUser(name, email, phone, password)
+    if (response.ok) {
+      GetNotification("Usuario registrado correctamente");
+      router.replace("/login");
+    }else{
+      if(response.status === 409){
+        GetNotification("Este email ya se encuentra registrado");
+      }
+    }
   };
 
   return (

@@ -1,7 +1,22 @@
-import { StyleSheet, Text, View } from "react-native";
-
+import { router } from "expo-router";
+import { Pressable, StyleSheet, Text, View } from "react-native";
 export default function HomeScreen() {
   const userName = "Admin"; // luego vendrá del backend
+  // const [users, setUsers] = useState<User[]>([]);
+
+  // useEffect(() => {
+  //   const fetchData = async () => {
+  //     try {
+  //       const data = await getUsers();
+  //       console.log(data)
+  //       setUsers(data);
+  //     } catch (error) {
+  //       console.error(error);
+  //     }
+  //   };
+
+  //   fetchData();
+  // }, []);
 
   return (
     <View style={styles.container}>
@@ -17,6 +32,23 @@ export default function HomeScreen() {
         asegurar que las vacunas se mantengan dentro de los rangos adecuados de
         almacenamiento.
       </Text>
+
+      <Pressable
+        style={styles.button}
+        onPress={() => router.push("/listUsuarios")}
+      >
+        <Text style={styles.buttonText}>Ver usuarios</Text>
+      </Pressable>
+
+      
+      {/* {users.map((user, index) => (
+        <View style={styles.row}>
+          <Text style={styles.header}>{user.name}</Text>
+          <Text style={styles.header}>{user.email}</Text>
+          <Text style={styles.header}>{user.phone}</Text>
+        </View>
+      ))
+      } */}
     </View>
   );
 }
@@ -50,4 +82,39 @@ const styles = StyleSheet.create({
     textAlign: "center",
     lineHeight: 24,
   },
+
+  // table: {
+  //   borderWidth: 1,
+  //   borderColor: "#ccc",
+  // },
+  // row: {
+  //   flexDirection: "row",
+  // },
+  // header: {
+  //   flex: 1,
+  //   fontWeight: "bold",
+  //   padding: 10,
+  //   backgroundColor: "#eee",
+  // },
+  cell: {
+    flex: 1,
+    padding: 10,
+    borderTopWidth: 1,
+    borderColor: "#ccc",
+    color: "#fff"
+  },
+
+  button: {
+  marginTop: 30,
+  backgroundColor: "#3b82f6",
+  paddingVertical: 12,
+  paddingHorizontal: 20,
+  borderRadius: 10,
+},
+
+  buttonText: {
+  color: "white",
+  fontSize: 16,
+  fontWeight: "600",
+},
 });

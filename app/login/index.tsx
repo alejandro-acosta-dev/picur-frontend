@@ -1,6 +1,13 @@
 import { router } from "expo-router";
 import { useState } from "react";
-import { Image, Pressable, StyleSheet, Text, View } from "react-native";
+import {
+  Image,
+  KeyboardAvoidingView,
+  Platform,
+  Pressable,
+  ScrollView,
+  StyleSheet, Text, View
+} from "react-native";
 import { login } from "../../services/login.service";
 import Button from "../components/Button";
 import Input from "../components/Input";
@@ -22,6 +29,14 @@ export default function LoginScreen() {
   };
 
   return (
+    <KeyboardAvoidingView
+    style={{ flex: 1 }}
+    behavior={Platform.OS === "ios" ? "padding" : "height"}
+    >
+    <ScrollView
+      contentContainerStyle={{ flexGrow: 1, justifyContent: "center" }}
+      keyboardShouldPersistTaps="handled"
+    >
     <View style={styles.container}>
       <View style={styles.content}>
         <Image
@@ -60,6 +75,8 @@ export default function LoginScreen() {
         </View>
       </View>
     </View>
+    </ScrollView>
+  </KeyboardAvoidingView>
   );
 }
 
@@ -70,8 +87,7 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     alignItems: "center",
     padding: 24,
-    // marginBottom: 200,
-    marginBottom: 100,
+    marginBottom: 80,
   },
 
   content: {

@@ -48,6 +48,7 @@ export default function RecoverPasswordScreen() {
         placeholder="Correo electrónico"
         value={email}
         onChangeText={setEmail}
+        style={{marginBottom: 15}}
       />
       <Button title="Validar email" onPress={() => handleValidEmail()} />
     </View>
@@ -64,11 +65,14 @@ const styles = StyleSheet.create({
   },
   title: {
     fontSize: 24,
-    marginBottom: 10,
+    marginBottom: 20,
     color: "white",
   },
   text: {
     fontSize: 16,
     color: "white",
+    marginBottom: 20,
+    textAlign: "center",
+    
   },
 });
