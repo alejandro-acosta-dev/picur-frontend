@@ -1,55 +1,73 @@
-import { router } from "expo-router";
-import { Pressable, StyleSheet, Text, View } from "react-native";
+import { router, Stack } from "expo-router";
+import { Alert, Pressable, StyleSheet, Text, View } from "react-native";
 export default function HomeScreen() {
   const userName = "Admin"; // luego vendrá del backend
-  // const [users, setUsers] = useState<User[]>([]);
-
-  // useEffect(() => {
-  //   const fetchData = async () => {
-  //     try {
-  //       const data = await getUsers();
-  //       console.log(data)
-  //       setUsers(data);
-  //     } catch (error) {
-  //       console.error(error);
-  //     }
-  //   };
-
-  //   fetchData();
-  // }, []);
+  const handleLogout = () => {
+  Alert.alert(
+    "Cerrar sesión",
+    "¿Seguro que deseas cerrar sesión?",
+    [
+      {
+        text: "Cancelar",
+        style: "cancel",
+      },
+      {
+        text: "Sí, salir",
+        style: "destructive",
+        onPress: () => router.replace("/login"),
+      },
+    ]
+  );
+};;
+  
 
   return (
-    <View style={styles.container}>
-      <Text style={styles.title}>Bienvenido {userName}</Text>
+    <>
+      {/* 🔴 Configuración del header */}
+      <Stack.Screen
+        options={{
+          headerBackVisible: false,
+          headerRight: () => (
+            <Pressable onPress={handleLogout}>
+              <Text style={{ color: "#ef4444", fontWeight: "bold" }}>
+                Salir
+              </Text>
+            </Pressable>
+          ),
+        }}
+      />
 
-      <Text style={styles.subtitle}>FrigoSafe</Text>
+      <View style={styles.container}>
+        <Text style={styles.title}>Bienvenido {userName}</Text>
 
-      <Text style={styles.description}>
-        FrigoSafe es una plataforma de monitoreo inteligente diseñada para
-        garantizar la correcta conservación de vacunas mediante el control
-        continuo de la cadena de frío. Nuestro sistema permite detectar
-        variaciones de temperatura en tiempo real, generar alertas tempranas y
-        asegurar que las vacunas se mantengan dentro de los rangos adecuados de
-        almacenamiento.
-      </Text>
+        <Text style={styles.subtitle}>FrigoSafe</Text>
 
-      <Pressable
-        style={styles.button}
-        onPress={() => router.push("/listUsuarios")}
-      >
-        <Text style={styles.buttonText}>Ver usuarios</Text>
-      </Pressable>
+        <Text style={styles.description}>
+          FrigoSafe es una plataforma de monitoreo inteligente diseñada para
+          garantizar la correcta conservación de vacunas mediante el control
+          continuo de la cadena de frío. Nuestro sistema permite detectar
+          variaciones de temperatura en tiempo real, generar alertas tempranas y
+          asegurar que las vacunas se mantengan dentro de los rangos adecuados de
+          almacenamiento.
+        </Text>
 
-      
-      {/* {users.map((user, index) => (
-        <View style={styles.row}>
-          <Text style={styles.header}>{user.name}</Text>
-          <Text style={styles.header}>{user.email}</Text>
-          <Text style={styles.header}>{user.phone}</Text>
-        </View>
-      ))
-      } */}
-    </View>
+        {/* 🔵 Usuarios */}
+        <Pressable
+          style={styles.button}
+          onPress={() => router.push("/listUsuarios")}
+        >
+          <Text style={styles.buttonText}>Ver usuarios</Text>
+        </Pressable>
+
+        {/* 🟢 Dashboard */}
+        <Pressable
+          style={styles.buttonDashboard}
+          onPress={() => router.push("/dashboard")}
+        >
+          <Text style={styles.buttonText}>Ir al Dashboard</Text>
+        </Pressable>
+      </View>
+    </>
   );
 }
 
@@ -83,27 +101,6 @@ const styles = StyleSheet.create({
     lineHeight: 24,
   },
 
-  // table: {
-  //   borderWidth: 1,
-  //   borderColor: "#ccc",
-  // },
-  // row: {
-  //   flexDirection: "row",
-  // },
-  // header: {
-  //   flex: 1,
-  //   fontWeight: "bold",
-  //   padding: 10,
-  //   backgroundColor: "#eee",
-  // },
-  cell: {
-    flex: 1,
-    padding: 10,
-    borderTopWidth: 1,
-    borderColor: "#ccc",
-    color: "#fff"
-  },
-
   button: {
   marginTop: 30,
   backgroundColor: "#3b82f6",
@@ -117,4 +114,15 @@ const styles = StyleSheet.create({
   fontSize: 16,
   fontWeight: "600",
 },
+
+buttonDashboard: {
+  marginTop: 20,
+  backgroundColor: "#22c55e", // verde
+  paddingVertical: 12,
+  paddingHorizontal: 20,
+  borderRadius: 10,
+},
+
+
+
 });
