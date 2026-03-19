@@ -1,12 +1,14 @@
 import { User } from "@/interfaces/User";
 import { getUsers } from "@/services/user.service";
+import { Ionicons } from "@expo/vector-icons";
 import { useEffect, useState } from "react";
 import {
-    ActivityIndicator,
-    FlatList,
-    StyleSheet,
-    Text,
-    View,
+  ActivityIndicator,
+  FlatList,
+  Pressable,
+  StyleSheet,
+  Text,
+  View
 } from "react-native";
 
 export default function ListUsuariosScreen() {
@@ -56,9 +58,32 @@ export default function ListUsuariosScreen() {
         keyExtractor={(item, index) => index.toString()}
         renderItem={({ item }) => (
           <View style={styles.card}>
-            <Text style={styles.name}>{item.name}</Text>
-            <Text style={styles.text}>{item.email}</Text>
-            <Text style={styles.text}>{item.phone}</Text>
+            <View style={styles.rowContainer}>
+
+              {/* 🧾 Información */}
+              <View style={styles.info}>
+                <View style={styles.nameContainer}>
+                  <Ionicons name="person-circle" size={22} color="#3b82f6" />
+                  <Text style={styles.name}>{item.name}</Text>
+                </View>
+                <Text style={styles.text}>{item.email}</Text>
+                <Text style={styles.text}>{item.phone}</Text>
+              </View>
+
+              {/* 🔘 Acciones */}
+              <View style={styles.actions}>
+                <Pressable style={styles.editButton}>
+                  <Ionicons name="pencil" size={16} color="white" />
+                  <Text style={styles.actionText}>Actualizar</Text>
+                </Pressable>
+
+                <Pressable style={styles.deleteButton}>
+                  <Ionicons name="trash" size={16} color="white" />
+                  <Text style={styles.actionText}>Eliminar</Text>
+                </Pressable>
+              </View>
+
+            </View>
           </View>
         )}
       />
@@ -85,7 +110,7 @@ const styles = StyleSheet.create({
     backgroundColor: "#1f2937",
     padding: 15,
     borderRadius: 10,
-    marginBottom: 10,
+    marginBottom: 30,
   },
 
   name: {
@@ -112,5 +137,57 @@ const styles = StyleSheet.create({
 
   emptyText: {
     color: "#9ca3af",
+  },
+  rowContainer: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+  },
+
+  info: {
+    flex: 1,
+  },
+
+  actions: {
+    justifyContent: "space-between",
+    alignItems: "flex-end",
+    gap: 8,
+  },
+
+  editButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 5,
+    backgroundColor: "#3b82f6",
+    paddingVertical: 6,
+    width: 110,
+    paddingHorizontal: 10,
+    borderRadius: 6,
+    marginBottom: 10
+
+  },
+
+  deleteButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 5,
+    backgroundColor: "#ef4444",
+    paddingVertical: 6,
+    width: 110,
+    paddingHorizontal: 10,
+    borderRadius: 6,
+  },
+
+  actionText: {
+    color: "white",
+    fontSize: 12,
+    fontWeight: "600",
+  },
+
+  nameContainer: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    marginBottom: 2,
   },
 });
