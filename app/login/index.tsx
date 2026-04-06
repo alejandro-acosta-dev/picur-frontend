@@ -1,3 +1,4 @@
+import { Ionicons } from "@expo/vector-icons";
 import { router } from "expo-router";
 import { useState } from "react";
 import {
@@ -30,57 +31,77 @@ export default function LoginScreen() {
 
   return (
     <KeyboardAvoidingView
-    style={{ flex: 1 }}
-    behavior={Platform.OS === "ios" ? "padding" : "height"}
+      style={{ flex: 1 }}
+      behavior={Platform.OS === "ios" ? "padding" : "height"}
     >
-    <ScrollView
-      contentContainerStyle={{ flexGrow: 1, justifyContent: "center" }}
-      keyboardShouldPersistTaps="handled"
-    >
-    <View style={styles.container}>
-      <View style={styles.content}>
-        <Image
-          source={require("../../assets/images/Logo2.png")}
-          style={styles.logo}
-        />
+      <ScrollView
+        contentContainerStyle={{ flexGrow: 1, justifyContent: "center" }}
+        keyboardShouldPersistTaps="handled"
+      >
+        <View style={styles.container}>
+          <View style={styles.content}>
+            <Image
+              source={require("../../assets/images/Logo2.png")}
+              style={styles.logo}
+            />
 
-        <Text style={styles.title}>FrigoSafe</Text>
-        <Text style={styles.subtitle}>Monitoreo Inteligente de Vacunas</Text>
+            <Text style={styles.title}>FrigoSafe</Text>
+            <Text style={styles.subtitle}>Monitoreo Inteligente de Vacunas</Text>
 
-        <View style={styles.form}>
-          <Input
-            placeholder="Correo electrónico"
-            value={email}
-            onChangeText={setEmail}
-          />
+            <View style={styles.form}>
+              <Input
+                placeholder="Correo electrónico"
+                value={email}
+                onChangeText={setEmail}
+              />
 
-          <Input
-            placeholder="Contraseña"
-            secureTextEntry
-            value={password}
-            onChangeText={setPassword}
-          />
+              <Input
+                placeholder="Contraseña"
+                secureTextEntry
+                value={password}
+                onChangeText={setPassword}
+              />
 
-          <Button title="Iniciar sesión" onPress={handleLogin} />
+              <Button title="Iniciar sesión" onPress={handleLogin} />
 
-          {error ? <Text style={styles.error}>{error}</Text> : null}
+              {error ? <Text style={styles.error}>{error}</Text> : null}
 
-          <Pressable onPress={() => router.push("/recover-password")}>
-            <Text style={styles.forgot}>¿Olvidaste tu contraseña?</Text>
-          </Pressable>
+              <Pressable onPress={() => router.push("/recover-password")}>
+                <Text style={styles.forgot}>¿Olvidaste tu contraseña?</Text>
+              </Pressable>
 
-          <Pressable onPress={() => router.push("/register")}>
-            <Text style={styles.register}>¿No tienes cuenta? <Text style={styles.link}>Crear cuenta</Text></Text>
-          </Pressable>
+              <Pressable onPress={() => router.push("/register")}>
+                <Text style={styles.register}>¿No tienes cuenta? <Text style={styles.link}>Crear cuenta</Text></Text>
+              </Pressable>
+
+              {/* 🤖 Botón IA */}
+              <Pressable
+                style={styles.aiButton}
+                onPress={() => router.push("/chat-ai")}
+              >
+                <Ionicons name="hardware-chip" size={28} color="white" />
+              </Pressable>
+            </View>
+          </View>
         </View>
-      </View>
-    </View>
-    </ScrollView>
-  </KeyboardAvoidingView>
+      </ScrollView>
+    </KeyboardAvoidingView>
   );
 }
 
 const styles = StyleSheet.create({
+  aiButton: {
+    position: "absolute",
+    bottom: 30,
+    right: 25,
+    width: 65,
+    height: 65,
+    borderRadius: 32.5,
+    backgroundColor: "#2563eb",
+    justifyContent: "center",
+    alignItems: "center",
+    elevation: 8,
+  },
   container: {
     flex: 1,
     backgroundColor: "#0a0a0a",
@@ -130,21 +151,21 @@ const styles = StyleSheet.create({
     fontWeight: "500",
   },
   error: {
-  color: "#ef4444", // rojo tipo Tailwind
-  textAlign: "center",
-  marginTop: 5,
-  fontSize: 13,
-  fontWeight: "500",
+    color: "#ef4444", // rojo tipo Tailwind
+    textAlign: "center",
+    marginTop: 5,
+    fontSize: 13,
+    fontWeight: "500",
   },
   register: {
-  marginTop: 15,
-  textAlign: "center",
-  color: "#9ca3af",
-  fontSize: 14,
-},
+    marginTop: 15,
+    textAlign: "center",
+    color: "#9ca3af",
+    fontSize: 14,
+  },
 
-link: {
-  color: "#3b82f6",
-  fontWeight: "600",
-},
+  link: {
+    color: "#3b82f6",
+    fontWeight: "600",
+  },
 });

@@ -29,7 +29,7 @@ export default function HomeScreen() {
           headerBackVisible: false,
           headerRight: () => (
             <Pressable onPress={handleLogout}>
-              <Text style={{ color: "#ef4444", fontWeight: "bold" }}>
+              <Text style={{ color: "#ef4444", fontWeight: "bold", fontSize: 18 }}>
                 Salir
               </Text>
             </Pressable>

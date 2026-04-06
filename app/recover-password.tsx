@@ -9,9 +9,27 @@ import Input from "./components/Input";
 
 export default function RecoverPasswordScreen() {
   const [email, setEmail] = useState("");
+  const isValidEmail = (email: string): boolean => {
+    const regex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    return regex.test(email);
+  };
 
   const handleValidEmail = async () => {
+
+    // 🔹 Validar campo vacío
+    if (!email.trim()) {
+      GetNotification("Por favor ingrese un correo electrónico");
+      return;
+    }
+
+    // 🔹 Validar formato
+    if (!isValidEmail(email)) {
+      GetNotification("Ingrese un correo electrónico válido");
+      return;
+    }
+
     let responseEmail = await recoveryPasswordByEmail(email);
+
     if (responseEmail) {
       let response = await notification();
       const { status } = await Notifications.requestPermissionsAsync();
@@ -42,15 +60,19 @@ export default function RecoverPasswordScreen() {
     <View style={styles.container}>
       <Text style={styles.title}>Recuperar contraseña</Text>
       <Text style={styles.text}>
-        Aquí el usuario podrá ingresar el código y su nueva contraseña.
+        Aquí el usuario podrá ingresar su email se le enviará un código de autenticación.
       </Text>
       <Input
         placeholder="Correo electrónico"
         value={email}
         onChangeText={setEmail}
-        style={{marginBottom: 15}}
+        style={{ marginBottom: 15 }}
       />
-      <Button title="Validar email" onPress={() => handleValidEmail()} />
+      <Button
+        title="Validar email"
+        onPress={handleValidEmail}
+        disabled={!email || !isValidEmail(email)}
+      />
     </View>
   );
 }
@@ -73,6 +95,6 @@ const styles = StyleSheet.create({
     color: "white",
     marginBottom: 20,
     textAlign: "center",
-    
+
   },
 });

@@ -3,11 +3,19 @@ import { Pressable, StyleSheet, Text } from "react-native";
 type Props = {
   title: string;
   onPress: () => void;
+  disabled?: boolean;
 };
 
-export default function Button({ title, onPress }: Props) {
+export default function Button({ title, onPress, disabled = false }: Props) {
   return (
-    <Pressable style={styles.button} onPress={onPress}>
+    <Pressable
+      onPress={onPress}
+      disabled={disabled}
+      style={[
+        styles.button,
+        disabled && styles.buttonDisabled // 👈 estilo condicional
+      ]}
+    >
       <Text style={styles.text}>{title}</Text>
     </Pressable>
   );
@@ -23,6 +31,10 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
     marginTop: 20,
+  },
+   buttonDisabled: {
+    backgroundColor: "#93c5fd", // azul más claro
+    opacity: 0.7,
   },
   text: {
     color: "white",

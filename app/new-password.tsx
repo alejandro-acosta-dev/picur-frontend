@@ -85,13 +85,13 @@ const styles = StyleSheet.create({
     alignItems: "center",
     backgroundColor: "black",
     padding: 20,
-    marginBottom: 100,
-    gap: 10,
+    marginBottom: 120,
+    gap: 15,
   },
 
   title: {
     fontSize: 26,
-    marginBottom: 30,
+    marginBottom: 20,
     color: "white",
     fontWeight: "bold",
   },
