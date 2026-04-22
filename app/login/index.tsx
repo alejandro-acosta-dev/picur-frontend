@@ -1,4 +1,3 @@
-import { Ionicons } from "@expo/vector-icons";
 import { router } from "expo-router";
 import { useState } from "react";
 import {
@@ -75,12 +74,12 @@ export default function LoginScreen() {
               </Pressable>
 
               {/* 🤖 Botón IA */}
-              <Pressable
+              {/* <Pressable
                 style={styles.aiButton}
                 onPress={() => router.push("/chat-ai")}
               >
                 <Ionicons name="hardware-chip" size={28} color="white" />
-              </Pressable>
+              </Pressable> */}
             </View>
           </View>
         </View>
