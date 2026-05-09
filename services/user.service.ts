@@ -44,3 +44,35 @@ export const getUsers = async () => {
   });
   return await response.json();
 };
+
+export const deleteUser = async (userId: number) => {
+  const response = await fetch(
+    `${process.env.EXPO_PUBLIC_API_URL}/User/${userId}`,
+    {
+      method: "DELETE",
+      headers: {
+        "Content-Type": "application/json",
+      },
+    },
+  );
+  return response;
+};
+
+export const updateUser = async (
+  userId: number,
+  name: string,
+  email: string,
+  phone: string,
+) => {
+  const response = await fetch(
+    `${process.env.EXPO_PUBLIC_API_URL}/User/${userId}`,
+    {
+      method: "PUT",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ id: userId, name, email, phone }),
+    },
+  );
+  return response;
+};
