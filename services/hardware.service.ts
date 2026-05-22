@@ -1,20 +1,9 @@
-export const getLatestReading = async () => {
-  const response = await fetch(
-    `${process.env.EXPO_PUBLIC_API_URL}/SensorData/latest`,
-    {
-      headers: {
-        "Content-Type": "application/json",
-      },
-    },
-  );
-  return await response.json();
-};
+import { HardwareReading } from "@/interfaces/HardwareReading";
 
-export const getReadings = async () => {
-  const response = await fetch(`${process.env.EXPO_PUBLIC_API_URL}/SensorData`, {
-    headers: {
-      "Content-Type": "application/json",
-    },
+export const getReadings = async (): Promise<HardwareReading[]> => {
+  const response = await fetch(`${process.env.EXPO_PUBLIC_API_URL}/reading`, {
+    headers: { "Content-Type": "application/json" },
   });
-  return await response.json();
+  if (!response.ok) throw new Error(`HTTP ${response.status}`);
+  return response.json();
 };

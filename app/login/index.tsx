@@ -6,10 +6,12 @@ import {
   Platform,
   Pressable,
   ScrollView,
-  StyleSheet, Text, View
+  StyleSheet,
+  Text,
+  View,
 } from "react-native";
 import { login } from "../../services/login.service";
-import Button from "../components/Button";
+import Button from "../components/button";
 import Input from "../components/Input";
 
 export default function LoginScreen() {
@@ -18,13 +20,12 @@ export default function LoginScreen() {
   const [error, setError] = useState("");
 
   const handleLogin = async () => {
-    let response = await login(email, password);
+    setError("");
+    const response = await login(email, password);
     if (response.success) {
       router.push("/home");
     } else {
-      setError("Correo electrónico o contraseña incorrectos");
-      // setEmail("");
-      setPassword("");
+      setError("Correo o contraseña incorrectos");
     }
   };
 
@@ -45,7 +46,9 @@ export default function LoginScreen() {
             />
 
             <Text style={styles.title}>FrigoSafe</Text>
-            <Text style={styles.subtitle}>Monitoreo Inteligente de Vacunas</Text>
+            <Text style={styles.subtitle}>
+              Monitoreo Inteligente de Vacunas
+            </Text>
 
             <View style={styles.form}>
               <Input
@@ -70,7 +73,10 @@ export default function LoginScreen() {
               </Pressable>
 
               <Pressable onPress={() => router.push("/register")}>
-                <Text style={styles.register}>¿No tienes cuenta? <Text style={styles.link}>Crear cuenta</Text></Text>
+                <Text style={styles.register}>
+                  ¿No tienes cuenta?{" "}
+                  <Text style={styles.link}>Crear cuenta</Text>
+                </Text>
               </Pressable>
 
               {/* 🤖 Botón IA */}

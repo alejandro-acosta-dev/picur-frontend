@@ -1,8 +1,13 @@
+import { useCallback, useEffect, useState } from "react";
+import { useFocusEffect } from "expo-router";
 import { cleanHistory } from "@/services/chatHistory.service";
+import { getReadings } from "@/services/hardware.service";
+import { HardwareReading } from "@/interfaces/HardwareReading";
 import { GetNotification } from "@/utils/notification";
 import { Ionicons } from "@expo/vector-icons";
 import { router } from "expo-router";
 import {
+  ActivityIndicator,
   Alert,
   Dimensions,
   Pressable,
@@ -14,7 +19,6 @@ import {
 import { LineChart } from "react-native-chart-kit";
 
 const SCREEN_W = Dimensions.get("window").width;
-// chart-kit incluye el eje Y en su ancho total — usamos el ancho completo menos padding del contenedor
 const CHART_W = SCREEN_W - 40;
 
 const TEMP_SAFE_LOW = 2;
@@ -23,39 +27,101 @@ const TEMP_MIN_DISPLAY = 0;
 const TEMP_MAX_DISPLAY = 12;
 
 const safeStartPct =
-  ((TEMP_SAFE_LOW - TEMP_MIN_DISPLAY) /
-    (TEMP_MAX_DISPLAY - TEMP_MIN_DISPLAY)) *
-  100;
+  ((TEMP_SAFE_LOW - TEMP_MIN_DISPLAY) / (TEMP_MAX_DISPLAY - TEMP_MIN_DISPLAY)) * 100;
 const safeWidthPct =
-  ((TEMP_SAFE_HIGH - TEMP_SAFE_LOW) /
-    (TEMP_MAX_DISPLAY - TEMP_MIN_DISPLAY)) *
-  100;
+  ((TEMP_SAFE_HIGH - TEMP_SAFE_LOW) / (TEMP_MAX_DISPLAY - TEMP_MIN_DISPLAY)) * 100;
 
-// ── Datos quemados — misma estructura que la DB (Id, Temperature, Timestamp, Door) ──
+const POLL_INTERVAL_MS = 5_000;
 
-// Lecturas horarias → simplificadas a 7 puntos (cada ~4 horas) para mejor legibilidad
-const lineLabels = ["00h", "04h", "08h", "12h", "16h", "20h", "23h"];
-const tempReadings = [4.2, 4.4, 5.3, 8.4, 7.2, 5.4, 9.1];
-const refMin = Array(7).fill(TEMP_SAFE_LOW);
-const refMax = Array(7).fill(TEMP_SAFE_HIGH);
+// ── Helpers para derivar datos del array de lecturas ─────────────────────────
 
-// Promedios diarios — últimos 7 días
-const getDay = (ago: number) => {
-  const labels = ["Dom", "Lun", "Mar", "Mié", "Jue", "Vie", "Sáb"];
-  const d = new Date();
-  d.setDate(d.getDate() - ago);
-  return labels[d.getDay()];
-};
+// Garantiza que el timestamp se interprete como UTC aunque el backend omita la 'Z'
+function toUtcMs(ts: string): number {
+  const normalized =
+    ts.endsWith("Z") || /[+-]\d{2}:\d{2}$/.test(ts) ? ts : ts + "Z";
+  return new Date(normalized).getTime();
+}
 
-const weeklyData = [
-  { label: getDay(6), value: 4.8 },
-  { label: getDay(5), value: 5.2 },
-  { label: getDay(4), value: 4.9 },
-  { label: getDay(3), value: 5.5 },
-  { label: getDay(2), value: 6.1 },
-  { label: getDay(1), value: 8.7 },
-  { label: getDay(0), value: 7.1 },
-];
+function deriveLatest(readings: HardwareReading[]): HardwareReading | null {
+  if (!readings.length) return null;
+  return readings.reduce((a, b) =>
+    toUtcMs(a.timestamp) > toUtcMs(b.timestamp) ? a : b,
+  );
+}
+
+function deriveLast24hChart(readings: HardwareReading[]): {
+  labels: string[];
+  temps: number[];
+} {
+  const now = Date.now();
+  const cutoff = now - 24 * 60 * 60 * 1000;
+  const recent = readings
+    .filter((r) => toUtcMs(r.timestamp) >= cutoff)
+    .sort((a, b) => toUtcMs(a.timestamp) - toUtcMs(b.timestamp));
+
+  if (recent.length === 0)
+    return { labels: ["--:--", "--:--", "--:--", "--:--", "--:--", "--:--", "--:--"], temps: [5, 5, 5, 5, 5, 5, 5] };
+
+  const MAX_POINTS = 7;
+  const sampled =
+    recent.length <= MAX_POINTS
+      ? recent
+      : Array.from({ length: MAX_POINTS }, (_, i) =>
+          recent[Math.round((i / (MAX_POINTS - 1)) * (recent.length - 1))],
+        );
+
+  return {
+    labels: sampled.map((r) => {
+      const d = new Date(r.timestamp);
+      const h = d.getHours().toString().padStart(2, "0");
+      const m = d.getMinutes().toString().padStart(2, "0");
+      return `${h}:${m}`;
+    }),
+    temps: sampled.map((r) => r.temperature),
+  };
+}
+
+function deriveLast7Days(readings: HardwareReading[]) {
+  const dayLabels = ["Dom", "Lun", "Mar", "Mié", "Jue", "Vie", "Sáb"];
+  return Array.from({ length: 7 }, (_, i) => {
+    const ago = 6 - i;
+    const d = new Date();
+    d.setDate(d.getDate() - ago);
+    const start = new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime();
+    const end = start + 24 * 60 * 60 * 1000;
+    const day = readings.filter((r) => {
+      const t = toUtcMs(r.timestamp);
+      return t >= start && t < end;
+    });
+    const avg =
+      day.length > 0
+        ? day.reduce((s, r) => s + r.temperature, 0) / day.length
+        : 0;
+    return { label: dayLabels[d.getDay()], value: parseFloat(avg.toFixed(1)) };
+  });
+}
+
+function deriveTimeOutOfRangeSecs(readings: HardwareReading[]): number {
+  const cutoff = Date.now() - 60 * 60 * 1000;
+  const recent = readings
+    .filter((r) => toUtcMs(r.timestamp) >= cutoff)
+    .sort((a, b) => toUtcMs(a.timestamp) - toUtcMs(b.timestamp));
+  if (recent.length < 2) return 0;
+  let secs = 0;
+  for (let i = 0; i < recent.length - 1; i++) {
+    if (
+      recent[i].temperature < TEMP_SAFE_LOW ||
+      recent[i].temperature > TEMP_SAFE_HIGH
+    ) {
+      secs += (toUtcMs(recent[i + 1].timestamp) - toUtcMs(recent[i].timestamp)) / 1000;
+    }
+  }
+  return Math.round(secs);
+}
+
+// ── Gráfico de barras ─────────────────────────────────────────────────────────
+
+const BAR_H = 140;
 
 const barColor = (v: number) => {
   if (v > TEMP_SAFE_HIGH) return "#ef4444";
@@ -63,40 +129,25 @@ const barColor = (v: number) => {
   return "#22c55e";
 };
 
-// ── Gráfico de barras personalizado (per-bar color) ──────────────────────────
-const BAR_H = 140;
-
-function WeeklyBarChart() {
-  const maxVal = Math.max(...weeklyData.map((d) => d.value), TEMP_SAFE_HIGH + 1);
+function WeeklyBarChart({ data }: { data: { label: string; value: number }[] }) {
+  const maxVal = Math.max(...data.map((d) => d.value), TEMP_SAFE_HIGH + 1);
   return (
     <View>
       <View
-        style={{
-          flexDirection: "row",
-          alignItems: "flex-end",
-          height: BAR_H,
-          gap: 6,
-          paddingHorizontal: 4,
-        }}
+        style={{ flexDirection: "row", alignItems: "flex-end", height: BAR_H, gap: 6, paddingHorizontal: 4 }}
       >
-        {weeklyData.map((item, i) => {
-          const h = Math.round((item.value / maxVal) * (BAR_H - 24));
+        {data.map((item, i) => {
+          const h = item.value > 0 ? Math.max(Math.round((item.value / maxVal) * (BAR_H - 24)), 4) : 0;
           const c = barColor(item.value);
           return (
-            <View
-              key={i}
-              style={{ flex: 1, alignItems: "center", justifyContent: "flex-end" }}
-            >
-              <Text
-                style={{
-                  color: c,
-                  fontSize: 9,
-                  fontWeight: "700",
-                  marginBottom: 3,
-                }}
-              >
-                {item.value.toFixed(1)}°
-              </Text>
+            <View key={i} style={{ flex: 1, alignItems: "center", justifyContent: "flex-end" }}>
+              {item.value > 0 ? (
+                <Text style={{ color: c, fontSize: 9, fontWeight: "700", marginBottom: 3 }}>
+                  {item.value.toFixed(1)}°
+                </Text>
+              ) : (
+                <Text style={{ color: "#4b5563", fontSize: 9, marginBottom: 3 }}>—</Text>
+              )}
               <View
                 style={{
                   height: h,
@@ -104,34 +155,19 @@ function WeeklyBarChart() {
                   backgroundColor: c,
                   borderTopLeftRadius: 5,
                   borderTopRightRadius: 5,
-                  opacity: 0.9,
+                  opacity: item.value > 0 ? 0.9 : 0,
                 }}
               />
             </View>
           );
         })}
       </View>
-
-      {/* Eje X */}
       <View style={{ height: 1, backgroundColor: "#374151", marginTop: 1 }} />
-      <View
-        style={{
-          flexDirection: "row",
-          paddingHorizontal: 4,
-          gap: 6,
-          marginTop: 6,
-        }}
-      >
-        {weeklyData.map((item, i) => (
+      <View style={{ flexDirection: "row", paddingHorizontal: 4, gap: 6, marginTop: 6 }}>
+        {data.map((item, i) => (
           <Text
             key={i}
-            style={{
-              flex: 1,
-              textAlign: "center",
-              color: "#9ca3af",
-              fontSize: 10,
-              fontWeight: "600",
-            }}
+            style={{ flex: 1, textAlign: "center", color: "#9ca3af", fontSize: 10, fontWeight: "600" }}
           >
             {item.label}
           </Text>
@@ -144,21 +180,111 @@ function WeeklyBarChart() {
 // ─────────────────────────────────────────────────────────────────────────────
 
 export default function Dashboard() {
-  const reading = {
-    id: 1,
-    temperature: 9.1,
-    timestamp: new Date(Date.now() - 30000),
-    door: true,
-  };
+  const [readings, setReadings] = useState<HardwareReading[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
 
-  const extraData = {
-    timeOutOfRangeSecs: 180,
-    lastAlert: "Temperatura fuera del rango seguro",
-  };
+  const fetchReadings = useCallback(async () => {
+    try {
+      const data = await getReadings();
+      setReadings(data);
+      setLastUpdated(new Date());
+      setError(null);
+    } catch {
+      setError("Sin conexión con el servidor");
+    } finally {
+      setLoading(false);
+    }
+  }, []);
 
+  useFocusEffect(
+    useCallback(() => {
+      fetchReadings();
+      const interval = setInterval(fetchReadings, POLL_INTERVAL_MS);
+      return () => clearInterval(interval);
+    }, [fetchReadings]),
+  );
+
+  // ── Datos derivados ───────────────────────────────────────────────────────
+  const reading = deriveLatest(readings);
+  const weeklyData = deriveLast7Days(readings);
+  const { labels: lineLabels, temps: tempReadings } = deriveLast24hChart(readings);
+  const refMin = Array(lineLabels.length).fill(TEMP_SAFE_LOW);
+  const refMax = Array(lineLabels.length).fill(TEMP_SAFE_HIGH);
+  const timeOutOfRangeSecs = reading ? deriveTimeOutOfRangeSecs(readings) : 0;
+
+  const lastAlert = (() => {
+    if (!reading) return "Sin datos disponibles";
+
+    const t = reading.temperature;
+    const diff = (v: number) => Math.abs(v).toFixed(2);
+
+    // Crítico + puerta abierta
+    if ((t < 1 || t > 10) && reading.door)
+      return `Temperatura ${t.toFixed(2)}°C y puerta abierta — Riesgo elevado de pérdida de cadena de frío. Actuar de inmediato.`;
+
+    // Crítico por debajo
+    if (t < 1)
+      return `Temperatura crítica: ${t.toFixed(2)}°C — Riesgo de congelación de vacunas (${diff(t - 2)}°C bajo el mínimo). Revisar equipo de inmediato.`;
+
+    // Crítico por encima
+    if (t > 10)
+      return `Temperatura crítica: ${t.toFixed(2)}°C — Supera el límite máximo por ${diff(t - TEMP_SAFE_HIGH)}°C. Cadena de frío comprometida. Verificar equipo.`;
+
+    // Riesgo fuera de rango + puerta abierta
+    if ((t < TEMP_SAFE_LOW || t > TEMP_SAFE_HIGH) && reading.door)
+      return `Temperatura ${t.toFixed(2)}°C y puerta abierta — Fuera del rango seguro (2°C–8°C). Cerrar puerta y monitorear.`;
+
+    // Riesgo por encima del rango
+    if (t > TEMP_SAFE_HIGH)
+      return `Temperatura en riesgo: ${t.toFixed(2)}°C — ${diff(t - TEMP_SAFE_HIGH)}°C por encima del rango seguro (2°C–8°C). Monitorear de cerca.`;
+
+    // Riesgo por debajo del rango
+    if (t < TEMP_SAFE_LOW)
+      return `Temperatura en riesgo: ${t.toFixed(2)}°C — ${diff(TEMP_SAFE_LOW - t)}°C por debajo del rango seguro (2°C–8°C). Verificar configuración.`;
+
+    // Puerta abierta con temperatura normal
+    if (reading.door)
+      return `Puerta abierta — Cerrar inmediatamente para preservar la cadena de frío. Temperatura actual: ${t.toFixed(2)}°C.`;
+
+    // Todo normal
+    return `Sin alertas — Temperatura ${t.toFixed(2)}°C dentro del rango seguro (2°C–8°C). Puerta cerrada.`;
+  })();
+
+  // ── Pantalla de carga inicial ────────────────────────────────────────────
+  if (loading) {
+    return (
+      <View style={[styles.container, { justifyContent: "center", alignItems: "center" }]}>
+        <ActivityIndicator size="large" color="#3b82f6" />
+        <Text style={{ color: "#9ca3af", marginTop: 12, fontSize: 14 }}>
+          Cargando datos del sensor…
+        </Text>
+      </View>
+    );
+  }
+
+  // ── Sin datos ────────────────────────────────────────────────────────────
+  if (!reading) {
+    return (
+      <View style={[styles.container, { justifyContent: "center", alignItems: "center", padding: 32 }]}>
+        <Ionicons name="warning-outline" size={48} color="#f59e0b" />
+        <Text style={{ color: "white", fontSize: 18, fontWeight: "700", marginTop: 16, textAlign: "center" }}>
+          {error ?? "Sin lecturas disponibles"}
+        </Text>
+        <Pressable
+          onPress={fetchReadings}
+          style={{ marginTop: 20, backgroundColor: "#2563eb", paddingHorizontal: 24, paddingVertical: 12, borderRadius: 10 }}
+        >
+          <Text style={{ color: "white", fontWeight: "600" }}>Reintentar</Text>
+        </Pressable>
+      </View>
+    );
+  }
+
+  // ── Lógica de estado ─────────────────────────────────────────────────────
   const isInRange =
-    reading.temperature >= TEMP_SAFE_LOW &&
-    reading.temperature <= TEMP_SAFE_HIGH;
+    reading.temperature >= TEMP_SAFE_LOW && reading.temperature <= TEMP_SAFE_HIGH;
 
   const getStatus = (): "NORMAL" | "RIESGO" | "CRÍTICO" => {
     if (reading.temperature < 1 || reading.temperature > 10) return "CRÍTICO";
@@ -175,9 +301,7 @@ export default function Dashboard() {
 
   const indicatorPct = Math.min(
     Math.max(
-      ((reading.temperature - TEMP_MIN_DISPLAY) /
-        (TEMP_MAX_DISPLAY - TEMP_MIN_DISPLAY)) *
-        100,
+      ((reading.temperature - TEMP_MIN_DISPLAY) / (TEMP_MAX_DISPLAY - TEMP_MIN_DISPLAY)) * 100,
       0,
     ),
     100,
@@ -188,8 +312,8 @@ export default function Dashboard() {
     return m > 0 ? `${m}m ${s % 60}s` : `${s}s`;
   };
 
-  const relativeTime = (d: Date) => {
-    const s = Math.floor((Date.now() - d.getTime()) / 1000);
+  const relativeTime = (iso: string) => {
+    const s = Math.floor((Date.now() - new Date(iso).getTime()) / 1000);
     if (s < 60) return `hace ${s}s`;
     const m = Math.floor(s / 60);
     return m < 60 ? `hace ${m}min` : `hace ${Math.floor(m / 60)}h`;
@@ -216,24 +340,21 @@ export default function Dashboard() {
 
   return (
     <View style={styles.container}>
-      <ScrollView
-        showsVerticalScrollIndicator={false}
-        contentContainerStyle={styles.scroll}
-      >
+      <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scroll}>
+
+        {/* ── Indicador de refresco ── */}
+        {error && (
+          <View style={{ backgroundColor: "#7f1d1d22", borderColor: "#ef4444", borderWidth: 1, borderRadius: 8, padding: 10, marginBottom: 10, flexDirection: "row", alignItems: "center", gap: 8 }}>
+            <Ionicons name="cloud-offline-outline" size={16} color="#ef4444" />
+            <Text style={{ color: "#ef4444", fontSize: 12 }}>{error} — mostrando último dato conocido</Text>
+          </View>
+        )}
+
         {/* ── Estado general ── */}
-        <View
-          style={[
-            styles.statusBanner,
-            { backgroundColor: statusColor + "22", borderColor: statusColor },
-          ]}
-        >
+        <View style={[styles.statusBanner, { backgroundColor: statusColor + "22", borderColor: statusColor }]}>
           <View style={[styles.statusDot, { backgroundColor: statusColor }]} />
-          <Text style={[styles.statusText, { color: statusColor }]}>
-            {status}
-          </Text>
-          <Text style={styles.timestampText}>
-            {relativeTime(reading.timestamp)}
-          </Text>
+          <Text style={[styles.statusText, { color: statusColor }]}>{status}</Text>
+          <Text style={styles.timestampText}>{relativeTime(reading.timestamp)}</Text>
         </View>
 
         {/* ── Temperatura actual ── */}
@@ -244,31 +365,23 @@ export default function Dashboard() {
           </View>
 
           <Text style={[styles.tempValue, { color: tempColor }]}>
-            {reading.temperature.toFixed(1)}°C
+            {reading.temperature.toFixed(2)}°C
           </Text>
           <Text style={[styles.tempSubtitle, { color: tempColor }]}>
             {isInRange ? "Dentro del rango seguro" : "Fuera del rango seguro"}
           </Text>
 
-          {/* Barra visual de rango */}
           <View style={styles.barContainer}>
             <View style={styles.bar}>
               <View
                 style={[
                   styles.safeZone,
-                  {
-                    left: `${safeStartPct}%` as any,
-                    width: `${safeWidthPct}%` as any,
-                  },
+                  { left: `${safeStartPct}%` as any, width: `${safeWidthPct}%` as any },
                 ]}
               />
             </View>
-            <View
-              style={[styles.indicator, { left: `${indicatorPct}%` as any }]}
-            >
-              <View
-                style={[styles.indicatorDot, { backgroundColor: tempColor }]}
-              />
+            <View style={[styles.indicator, { left: `${indicatorPct}%` as any }]}>
+              <View style={[styles.indicatorDot, { backgroundColor: tempColor }]} />
             </View>
           </View>
 
@@ -292,17 +405,10 @@ export default function Dashboard() {
               />
               <Text style={styles.cardTitle}>Puerta</Text>
             </View>
-            <Text
-              style={[
-                styles.cardValue,
-                { color: reading.door ? "#ef4444" : "#22c55e" },
-              ]}
-            >
+            <Text style={[styles.cardValue, { color: reading.door ? "#ef4444" : "#22c55e" }]}>
               {reading.door ? "Abierta" : "Cerrada"}
             </Text>
-            {reading.door && (
-              <Text style={styles.doorWarning}>Revisar estado</Text>
-            )}
+            {reading.door && <Text style={styles.doorWarning}>Revisar estado</Text>}
           </View>
 
           <View style={[styles.card, styles.halfCard]}>
@@ -310,16 +416,8 @@ export default function Dashboard() {
               <Ionicons name="timer-outline" size={18} color="#9ca3af" />
               <Text style={styles.cardTitle}>Fuera de rango</Text>
             </View>
-            <Text
-              style={[
-                styles.cardValue,
-                {
-                  color:
-                    extraData.timeOutOfRangeSecs > 0 ? "#f59e0b" : "#22c55e",
-                },
-              ]}
-            >
-              {formatSecs(extraData.timeOutOfRangeSecs)}
+            <Text style={[styles.cardValue, { color: timeOutOfRangeSecs > 0 ? "#f59e0b" : "#22c55e" }]}>
+              {formatSecs(timeOutOfRangeSecs)}
             </Text>
           </View>
         </View>
@@ -330,15 +428,18 @@ export default function Dashboard() {
             <Ionicons name="warning-outline" size={18} color="#f59e0b" />
             <Text style={styles.cardTitle}>Última alerta</Text>
           </View>
-          <Text style={styles.alertText}>{extraData.lastAlert}</Text>
+          <Text style={styles.alertText}>{lastAlert}</Text>
         </View>
 
-        {/* ═══════════════════════════════════════
-              GRÁFICOS
-        ════════════════════════════════════════ */}
+        {/* ═══ GRÁFICOS ═══ */}
         <View style={styles.sectionHeader}>
           <Ionicons name="analytics-outline" size={15} color="#6b7280" />
           <Text style={styles.sectionTitle}>Análisis de temperatura</Text>
+          {lastUpdated && (
+            <Text style={{ color: "#4b5563", fontSize: 10, marginLeft: "auto" }}>
+              Fecha del sistema {lastUpdated.getHours().toString().padStart(2,"0")}:{lastUpdated.getMinutes().toString().padStart(2,"0")}:{lastUpdated.getSeconds().toString().padStart(2,"0")}
+            </Text>
+          )}
         </View>
 
         {/* ── Gráfico de líneas — últimas 24 horas ── */}
@@ -347,6 +448,11 @@ export default function Dashboard() {
             <Ionicons name="trending-up-outline" size={18} color="#9ca3af" />
             <Text style={styles.cardTitle}>Últimas 24 horas</Text>
           </View>
+
+          {/* Etiqueta eje Y */}
+          <Text style={{ color: "#6b7280", fontSize: 10, paddingHorizontal: 16, marginBottom: 2 }}>
+            ↑ Temperatura (°C)
+          </Text>
 
           <LineChart
             data={{
@@ -396,15 +502,16 @@ export default function Dashboard() {
                 stroke: "#3b82f6",
                 fill: "#1f2937",
               },
-              propsForBackgroundLines: {
-                stroke: "#2d3748",
-                strokeDasharray: "5,5",
-              },
+              propsForBackgroundLines: { stroke: "#2d3748", strokeDasharray: "5,5" },
             }}
             style={{ borderBottomLeftRadius: 12, borderBottomRightRadius: 12 }}
           />
 
-          {/* Leyenda */}
+          {/* Etiqueta eje X */}
+          <Text style={{ color: "#6b7280", fontSize: 10, textAlign: "center", marginTop: 4 }}>
+            Hora →
+          </Text>
+
           <View style={styles.lineLegend}>
             <View style={styles.lineSample} />
             <Text style={styles.legendText}>Temperatura registrada</Text>
@@ -417,14 +524,11 @@ export default function Dashboard() {
         <View style={styles.card}>
           <View style={styles.cardHeader}>
             <Ionicons name="calendar-outline" size={18} color="#9ca3af" />
-            <Text style={styles.cardTitle}>
-              Promedio diario · últimos 7 días
-            </Text>
+            <Text style={styles.cardTitle}>Promedio diario · últimos 7 días</Text>
           </View>
 
-          <WeeklyBarChart />
+          <WeeklyBarChart data={weeklyData} />
 
-          {/* Leyenda */}
           <View style={styles.legend}>
             <View style={styles.legendItem}>
               <View style={[styles.legendDot, { backgroundColor: "#22c55e" }]} />
@@ -442,7 +546,7 @@ export default function Dashboard() {
         </View>
       </ScrollView>
 
-      {/* ── Botones flotantes (sin cambios) ── */}
+      {/* ── Botones flotantes ── */}
       <Pressable style={styles.deleteChatButton} onPress={confirmDeleteHistory}>
         <Ionicons name="trash" size={24} color="white" />
       </Pressable>
@@ -451,10 +555,7 @@ export default function Dashboard() {
         <View style={styles.aiTooltip}>
           <Text style={styles.aiTooltipText}>Pregúntale a la IA</Text>
         </View>
-        <Pressable
-          style={styles.aiButton}
-          onPress={() => router.push("/chat-ai")}
-        >
+        <Pressable style={styles.aiButton} onPress={() => router.push("/chat-ai")}>
           <Ionicons name="hardware-chip" size={28} color="white" />
         </Pressable>
       </View>
@@ -467,7 +568,6 @@ const styles = StyleSheet.create({
 
   scroll: { padding: 20, paddingBottom: 170 },
 
-  // ── Status banner ──
   statusBanner: {
     flexDirection: "row",
     alignItems: "center",
@@ -482,44 +582,16 @@ const styles = StyleSheet.create({
   statusText: { fontSize: 16, fontWeight: "700", flex: 1 },
   timestampText: { color: "#6b7280", fontSize: 12 },
 
-  // ── Cards ──
-  card: {
-    backgroundColor: "#1f2937",
-    borderRadius: 12,
-    padding: 16,
-    marginBottom: 12,
-  },
-  cardHeader: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 6,
-    marginBottom: 10,
-  },
+  card: { backgroundColor: "#1f2937", borderRadius: 12, padding: 16, marginBottom: 12 },
+  cardHeader: { flexDirection: "row", alignItems: "center", gap: 6, marginBottom: 10 },
   cardTitle: { color: "#9ca3af", fontSize: 13, fontWeight: "500" },
 
-  // ── Temperature ──
-  tempValue: {
-    fontSize: 52,
-    fontWeight: "800",
-    letterSpacing: -1,
-    marginBottom: 4,
-  },
+  tempValue: { fontSize: 52, fontWeight: "800", letterSpacing: -1, marginBottom: 4 },
   tempSubtitle: { fontSize: 13, fontWeight: "500", marginBottom: 20 },
 
-  // ── Range bar ──
   barContainer: { position: "relative", marginBottom: 10 },
-  bar: {
-    height: 12,
-    backgroundColor: "#374151",
-    borderRadius: 6,
-    overflow: "hidden",
-  },
-  safeZone: {
-    position: "absolute",
-    height: "100%",
-    backgroundColor: "#22c55e",
-    opacity: 0.65,
-  },
+  bar: { height: 12, backgroundColor: "#374151", borderRadius: 6, overflow: "hidden" },
+  safeZone: { position: "absolute", height: "100%", backgroundColor: "#22c55e", opacity: 0.65 },
   indicator: { position: "absolute", top: -4, alignItems: "center" },
   indicatorDot: {
     width: 20,
@@ -543,13 +615,11 @@ const styles = StyleSheet.create({
   barLabelEdge: { color: "#6b7280", fontSize: 11 },
   barLabelSafe: { color: "#22c55e", fontSize: 11, fontWeight: "500" },
 
-  // ── Row (puerta + tiempo) ──
   row: { flexDirection: "row", gap: 12 },
   halfCard: { flex: 1 },
   cardValue: { fontSize: 22, fontWeight: "700", marginBottom: 4 },
   doorWarning: { color: "#f59e0b", fontSize: 11, fontWeight: "500" },
 
-  // ── Alert card ──
   alertCard: {
     backgroundColor: "#1f2937",
     borderRadius: 12,
@@ -560,7 +630,6 @@ const styles = StyleSheet.create({
   },
   alertText: { color: "white", fontSize: 14, fontWeight: "500" },
 
-  // ── Section header ──
   sectionHeader: {
     flexDirection: "row",
     alignItems: "center",
@@ -576,7 +645,6 @@ const styles = StyleSheet.create({
     letterSpacing: 1,
   },
 
-  // ── Chart legends ──
   lineLegend: {
     flexDirection: "row",
     alignItems: "center",
@@ -587,18 +655,8 @@ const styles = StyleSheet.create({
     borderTopWidth: 1,
     borderTopColor: "#374151",
   },
-  lineSample: {
-    width: 22,
-    height: 2,
-    backgroundColor: "#3b82f6",
-    borderRadius: 1,
-  },
-  refLineSample: {
-    width: 22,
-    height: 2,
-    backgroundColor: "#22c55e",
-    borderRadius: 1,
-  },
+  lineSample: { width: 22, height: 2, backgroundColor: "#3b82f6", borderRadius: 1 },
+  refLineSample: { width: 22, height: 2, backgroundColor: "#22c55e", borderRadius: 1 },
   legend: {
     flexDirection: "row",
     justifyContent: "center",
@@ -612,7 +670,6 @@ const styles = StyleSheet.create({
   legendDot: { width: 8, height: 8, borderRadius: 4 },
   legendText: { color: "#6b7280", fontSize: 11 },
 
-  // ── Floating buttons (unchanged) ──
   deleteChatButton: {
     position: "absolute",
     bottom: 145,

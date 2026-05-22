@@ -5,7 +5,8 @@ import { StyleSheet, Text, TextInput, View } from "react-native";
 
 export default function VerifyCodeScreen() {
   const { code, userId } = useLocalSearchParams();
-
+  console.log(code, "code");
+  console.log(userId, "userId");
   const [otp, setOtp] = useState(["", "", "", "", "", ""]);
   const inputs = useRef<(TextInput | null)[]>([]);
   const handleChange = async (value: string, index: number) => {
@@ -16,16 +17,19 @@ export default function VerifyCodeScreen() {
     if (value && index < 5) {
       inputs.current[index + 1]?.focus();
     }
-
+    console.log(otp);
+    console.log(newOtp);
+    //console.log(code);
     if (newOtp.every((digit) => digit !== "")) {
       if (Number(newOtp.join("")) === Number(code)) {
         router.push({
           pathname: "/new-password",
           params: {
-            userId
+            userId,
           },
         });
       } else {
+        console.log("OK)");
         GetNotification("El código ingresado es incorrecto");
       }
     }
@@ -100,6 +104,6 @@ const styles = StyleSheet.create({
     textAlign: "center",
     fontSize: 20,
     backgroundColor: "white",
-    marginBottom: 150
+    marginBottom: 150,
   },
 });

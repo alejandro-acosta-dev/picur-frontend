@@ -3,7 +3,7 @@ import { GetNotification } from "@/utils/notification";
 import { router, useLocalSearchParams } from "expo-router";
 import { useState } from "react";
 import { StyleSheet, Text, TouchableOpacity, View } from "react-native";
-import Button from "./components/Button";
+import Button from "./components/button";
 import Input from "./components/Input";
 
 export default function NewPasswordScreen() {
@@ -36,12 +36,12 @@ export default function NewPasswordScreen() {
 
     //Update password in backend
     let response = await updatePassword(userId as string, password);
-    
-    if(response.ok){
+
+    if (response.ok) {
       GetNotification("Contraseña cambiada exitosamente");
       router.replace("/login");
-    }else{
-       GetNotification("Error al cambiar la contraseña");
+    } else {
+      GetNotification("Error al cambiar la contraseña");
     }
   };
 
@@ -49,21 +49,19 @@ export default function NewPasswordScreen() {
     <View style={styles.container}>
       <Text style={styles.title}>Nueva contraseña</Text>
 
-      
       <Input
         placeholder="Nueva contraseña"
         secureTextEntry={!showPassword}
         value={password}
         onChangeText={setPassword}
       />
-      
+
       <Input
         placeholder="Confirmar contraseña"
         secureTextEntry={!showPassword}
         value={confirmPassword}
         onChangeText={setConfirmPassword}
       />
-      
 
       <TouchableOpacity onPress={() => setShowPassword(!showPassword)}>
         <Text style={styles.showPassword}>

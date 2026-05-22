@@ -3,14 +3,14 @@ import { GetNotification } from "@/utils/notification";
 import { router } from "expo-router";
 import { useRef, useState } from "react";
 import {
-  KeyboardAvoidingView,
-  Platform,
-  ScrollView,
-  StyleSheet,
-  Text,
-  View,
+    KeyboardAvoidingView,
+    Platform,
+    ScrollView,
+    StyleSheet,
+    Text,
+    View,
 } from "react-native";
-import Button from "./components/Button";
+import Button from "./components/button";
 import Input from "./components/Input";
 
 export default function RegisterScreen() {
@@ -56,7 +56,7 @@ export default function RegisterScreen() {
 
     if (!passwordRegex.test(password)) {
       setError(
-        "La contraseña debe tener 8 caracteres, mayúscula, minúscula, número y símbolo"
+        "La contraseña debe tener 8 caracteres, mayúscula, minúscula, número y símbolo",
       );
       return;
     }
@@ -67,12 +67,12 @@ export default function RegisterScreen() {
     }
 
     setError("");
-    let response = await createUser(name, email, phone, password)
+    let response = await createUser(name, email, phone, password);
     if (response.ok) {
       GetNotification("Usuario registrado correctamente");
       router.replace("/login");
-    }else{
-      if(response.status === 409){
+    } else {
+      if (response.status === 409) {
         GetNotification("Este email ya se encuentra registrado");
       }
     }
@@ -85,7 +85,11 @@ export default function RegisterScreen() {
     >
       <ScrollView
         ref={scrollRef}
-        contentContainerStyle={{ flexGrow: 1, justifyContent: "center", paddingVertical: 80 }}
+        contentContainerStyle={{
+          flexGrow: 1,
+          justifyContent: "center",
+          paddingVertical: 80,
+        }}
         keyboardShouldPersistTaps="handled"
       >
         <View style={styles.container}>

@@ -1,10 +1,13 @@
-import { notification, recoveryPasswordByEmail } from "@/services/notification.service";
+import {
+  notification,
+  recoveryPasswordByEmail,
+} from "@/services/notification.service";
 import { GetNotification } from "@/utils/notification";
 import * as Notifications from "expo-notifications";
 import { router } from "expo-router";
 import { useState } from "react";
 import { StyleSheet, Text, View } from "react-native";
-import Button from "./components/Button";
+import Button from "./components/button";
 import Input from "./components/Input";
 
 export default function RecoverPasswordScreen() {
@@ -15,7 +18,6 @@ export default function RecoverPasswordScreen() {
   };
 
   const handleValidEmail = async () => {
-
     // 🔹 Validar campo vacío
     if (!email.trim()) {
       GetNotification("Por favor ingrese un correo electrónico");
@@ -33,24 +35,25 @@ export default function RecoverPasswordScreen() {
     if (responseEmail) {
       let response = await notification();
       const { status } = await Notifications.requestPermissionsAsync();
-
+      console.log(response, "response");
+      console.log(responseEmail, "responseemail");
       if (status !== "granted") {
         return;
       } else {
         if (response) {
           GetNotification(response.message);
+          console.log("codee", response.code);
           router.push({
             pathname: "/verify-code",
             params: {
               code: response.code,
-              userId: responseEmail.id
+              userId: responseEmail.id,
             },
           });
         } else {
           GetNotification("Error al enviar el código");
         }
       }
-
     } else {
       GetNotification("El email ingresado no es válido");
     }
@@ -60,7 +63,8 @@ export default function RecoverPasswordScreen() {
     <View style={styles.container}>
       <Text style={styles.title}>Recuperar contraseña</Text>
       <Text style={styles.text}>
-        Aquí el usuario podrá ingresar su email se le enviará un código de autenticación.
+        Aquí el usuario podrá ingresar su email se le enviará un código de
+        autenticación.
       </Text>
       <Input
         placeholder="Correo electrónico"
@@ -95,6 +99,5 @@ const styles = StyleSheet.create({
     color: "white",
     marginBottom: 20,
     textAlign: "center",
-
   },
 });
