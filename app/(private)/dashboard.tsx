@@ -1,7 +1,8 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useFocusEffect } from "expo-router";
 import { cleanHistory } from "@/services/chatHistory.service";
 import { getReadings } from "@/services/hardware.service";
+import { sendAlertNotification } from "@/services/notification.service";
 import { HardwareReading } from "@/interfaces/HardwareReading";
 import { GetNotification } from "@/utils/notification";
 import { Ionicons } from "@expo/vector-icons";
@@ -10,6 +11,8 @@ import {
   ActivityIndicator,
   Alert,
   Dimensions,
+  FlatList,
+  Modal,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -119,6 +122,41 @@ function deriveTimeOutOfRangeSecs(readings: HardwareReading[]): number {
   return Math.round(secs);
 }
 
+// ── Historial de alertas ──────────────────────────────────────────────────────
+
+const ALERT_MAX = 15;
+
+function deriveAlertHistory(readings: HardwareReading[]) {
+  return readings
+    .filter(
+      (r) =>
+        r.temperature < TEMP_SAFE_LOW ||
+        r.temperature > TEMP_SAFE_HIGH ||
+        r.door,
+    )
+    .sort((a, b) => toUtcMs(b.timestamp) - toUtcMs(a.timestamp))
+    .slice(0, ALERT_MAX);
+}
+
+function alertSeverity(r: HardwareReading): "critical" | "warning" {
+  if (r.temperature < 1 || r.temperature > 10) return "critical";
+  return "warning";
+}
+
+function alertItemMessage(r: HardwareReading): string {
+  const t = r.temperature;
+  if (r.door && (t < TEMP_SAFE_LOW || t > TEMP_SAFE_HIGH))
+    return `${t.toFixed(2)}°C y puerta abierta — riesgo elevado`;
+  if (t < 1) return `Crítico: ${t.toFixed(2)}°C — riesgo de congelación`;
+  if (t > 10) return `Crítico: ${t.toFixed(2)}°C — cadena de frío comprometida`;
+  if (t > TEMP_SAFE_HIGH)
+    return `${t.toFixed(2)}°C — ${(t - TEMP_SAFE_HIGH).toFixed(2)}°C sobre el límite`;
+  if (t < TEMP_SAFE_LOW)
+    return `${t.toFixed(2)}°C — ${(TEMP_SAFE_LOW - t).toFixed(2)}°C bajo el límite`;
+  if (r.door) return `Puerta abierta — temp. ${t.toFixed(2)}°C`;
+  return `Alerta: ${t.toFixed(2)}°C`;
+}
+
 // ── Gráfico de barras ─────────────────────────────────────────────────────────
 
 const BAR_H = 140;
@@ -184,6 +222,8 @@ export default function Dashboard() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
+  const [showAlerts, setShowAlerts] = useState(false);
+  const lastAlertedTimestampRef = useRef<string | null>(null);
 
   const fetchReadings = useCallback(async () => {
     try {
@@ -206,6 +246,38 @@ export default function Dashboard() {
     }, [fetchReadings]),
   );
 
+  // ── Alerta WhatsApp — una vez por lectura nueva que esté en alerta ────────
+  useEffect(() => {
+    const latest = deriveLatest(readings);
+    if (!latest) return;
+
+    // Si ya alertamos sobre esta lectura exacta, no repetir
+    if (lastAlertedTimestampRef.current === latest.timestamp) return;
+
+    const t = latest.temperature;
+    const currentStatus =
+      t < 1 || t > 10 ? "CRÍTICO"
+      : t < TEMP_SAFE_LOW || t > TEMP_SAFE_HIGH || latest.door ? "RIESGO"
+      : "NORMAL";
+
+    if (currentStatus === "NORMAL") return;
+
+    const isOutOfRange = t < TEMP_SAFE_LOW || t > TEMP_SAFE_HIGH;
+    const isDoorOpen = latest.door;
+
+    const msg =
+      currentStatus === "CRÍTICO"
+        ? `Temperatura crítica: ${t.toFixed(2)}°C — Acción inmediata requerida.${isDoorOpen ? " Puerta abierta." : ""}`
+        : isOutOfRange && isDoorOpen
+          ? `Temperatura ${t.toFixed(2)}°C fuera del rango seguro y puerta abierta — Riesgo elevado.`
+          : isOutOfRange
+            ? `Temperatura en riesgo: ${t.toFixed(2)}°C — Fuera del rango seguro (2°C–8°C).`
+            : `Puerta abierta — Temperatura ${t.toFixed(2)}°C en rango seguro. Cerrar inmediatamente.`;
+
+    sendAlertNotification(msg).catch(() => {});
+    lastAlertedTimestampRef.current = latest.timestamp;
+  }, [readings]);
+
   // ── Datos derivados ───────────────────────────────────────────────────────
   const reading = deriveLatest(readings);
   const weeklyData = deriveLast7Days(readings);
@@ -213,6 +285,7 @@ export default function Dashboard() {
   const refMin = Array(lineLabels.length).fill(TEMP_SAFE_LOW);
   const refMax = Array(lineLabels.length).fill(TEMP_SAFE_HIGH);
   const timeOutOfRangeSecs = reading ? deriveTimeOutOfRangeSecs(readings) : 0;
+  const alertHistory = deriveAlertHistory(readings);
 
   const lastAlert = (() => {
     if (!reading) return "Sin datos disponibles";
@@ -309,7 +382,9 @@ export default function Dashboard() {
 
   const formatSecs = (s: number) => {
     const m = Math.floor(s / 60);
-    return m > 0 ? `${m}m ${s % 60}s` : `${s}s`;
+    if (m <= 0) return "0 min";
+    const h = Math.floor(m / 60);
+    return h > 0 ? `${h}h ${m % 60}min` : `${m} min`;
   };
 
   const relativeTime = (iso: string) => {
@@ -546,9 +621,80 @@ export default function Dashboard() {
         </View>
       </ScrollView>
 
+      {/* ── Modal historial de alertas ── */}
+      <Modal
+        visible={showAlerts}
+        transparent
+        animationType="slide"
+        onRequestClose={() => setShowAlerts(false)}
+      >
+        <Pressable style={styles.modalOverlay} onPress={() => setShowAlerts(false)}>
+          <Pressable style={styles.modalContainer} onPress={() => {}}>
+            <View style={styles.modalHandle} />
+
+            <View style={styles.modalHeader}>
+              <Ionicons name="notifications-outline" size={20} color="white" />
+              <Text style={styles.modalTitle}>Historial de alertas</Text>
+              <Text style={styles.modalSubtitle}>Últimas {ALERT_MAX} alertas</Text>
+              <Pressable onPress={() => setShowAlerts(false)} style={{ marginLeft: "auto" }}>
+                <Ionicons name="close" size={22} color="#9ca3af" />
+              </Pressable>
+            </View>
+
+            {alertHistory.length === 0 ? (
+              <View style={styles.noAlertsContainer}>
+                <Ionicons name="checkmark-circle-outline" size={40} color="#22c55e" />
+                <Text style={styles.noAlertsText}>Sin alertas registradas</Text>
+              </View>
+            ) : (
+              <FlatList
+                data={alertHistory}
+                keyExtractor={(_, i) => i.toString()}
+                contentContainerStyle={{ paddingBottom: 20 }}
+                renderItem={({ item, index }) => {
+                  const severity = alertSeverity(item);
+                  const color = severity === "critical" ? "#ef4444" : "#f59e0b";
+                  return (
+                    <View style={[styles.alertItem, { borderLeftColor: color }]}>
+                      <View style={styles.alertItemRow}>
+                        <Ionicons
+                          name={severity === "critical" ? "alert-circle-outline" : "warning-outline"}
+                          size={15}
+                          color={color}
+                        />
+                        <Text style={[styles.alertItemBadge, { color, borderColor: color }]}>
+                          {severity === "critical" ? "CRÍTICO" : "RIESGO"}
+                        </Text>
+                        <Text style={styles.alertItemTime}>
+                          {relativeTime(item.timestamp)}
+                        </Text>
+                        <Text style={styles.alertItemIndex}>#{alertHistory.length - index}</Text>
+                      </View>
+                      <Text style={styles.alertItemMsg}>{alertItemMessage(item)}</Text>
+                    </View>
+                  );
+                }}
+              />
+            )}
+          </Pressable>
+        </Pressable>
+      </Modal>
+
       {/* ── Botones flotantes ── */}
       <Pressable style={styles.deleteChatButton} onPress={confirmDeleteHistory}>
         <Ionicons name="trash" size={24} color="white" />
+      </Pressable>
+
+      {/* ── Botón campana ── */}
+      <Pressable style={styles.bellButton} onPress={() => setShowAlerts(true)}>
+        <Ionicons name="notifications-outline" size={24} color="#f59e0b" />
+        {alertHistory.length > 0 && (
+          <View style={styles.bellBadge}>
+            <Text style={styles.bellBadgeText}>
+              {alertHistory.length > 9 ? "9+" : alertHistory.length}
+            </Text>
+          </View>
+        )}
       </Pressable>
 
       <View style={styles.aiWrapper}>
@@ -669,6 +815,89 @@ const styles = StyleSheet.create({
   legendItem: { flexDirection: "row", alignItems: "center", gap: 6 },
   legendDot: { width: 8, height: 8, borderRadius: 4 },
   legendText: { color: "#6b7280", fontSize: 11 },
+
+  // ── Bell button ──
+  bellButton: {
+    position: "absolute",
+    bottom: 235,
+    right: 25,
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    backgroundColor: "#374151",
+    justifyContent: "center",
+    alignItems: "center",
+    elevation: 8,
+  },
+  bellBadge: {
+    position: "absolute",
+    top: -4,
+    right: -4,
+    backgroundColor: "#ef4444",
+    borderRadius: 10,
+    minWidth: 20,
+    height: 20,
+    justifyContent: "center",
+    alignItems: "center",
+    paddingHorizontal: 4,
+  },
+  bellBadgeText: { color: "white", fontSize: 10, fontWeight: "700" },
+
+  // ── Modal ──
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: "rgba(0,0,0,0.6)",
+    justifyContent: "flex-end",
+  },
+  modalContainer: {
+    backgroundColor: "#111827",
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
+    paddingHorizontal: 16,
+    paddingBottom: 34,
+    maxHeight: "75%",
+  },
+  modalHandle: {
+    width: 40,
+    height: 4,
+    backgroundColor: "#374151",
+    borderRadius: 2,
+    alignSelf: "center",
+    marginTop: 12,
+    marginBottom: 16,
+  },
+  modalHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    marginBottom: 16,
+    paddingBottom: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: "#1f2937",
+  },
+  modalTitle: { color: "white", fontSize: 16, fontWeight: "700" },
+  modalSubtitle: { color: "#6b7280", fontSize: 12 },
+  noAlertsContainer: { alignItems: "center", paddingVertical: 40, gap: 12 },
+  noAlertsText: { color: "#6b7280", fontSize: 14 },
+  alertItem: {
+    backgroundColor: "#1f2937",
+    borderRadius: 10,
+    padding: 12,
+    marginBottom: 8,
+    borderLeftWidth: 3,
+  },
+  alertItemRow: { flexDirection: "row", alignItems: "center", gap: 6, marginBottom: 4 },
+  alertItemBadge: {
+    fontSize: 10,
+    fontWeight: "700",
+    borderWidth: 1,
+    borderRadius: 4,
+    paddingHorizontal: 5,
+    paddingVertical: 1,
+  },
+  alertItemTime: { color: "#6b7280", fontSize: 11, marginLeft: 2 },
+  alertItemIndex: { color: "#4b5563", fontSize: 10, marginLeft: "auto" },
+  alertItemMsg: { color: "#d1d5db", fontSize: 13 },
 
   deleteChatButton: {
     position: "absolute",

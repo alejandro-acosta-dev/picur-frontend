@@ -11,6 +11,14 @@ export const notification = async () => {
   return await response.json();
 };
 
+export const sendAlertNotification = async (message: string): Promise<void> => {
+  await fetch(`${process.env.EXPO_PUBLIC_API_URL}/Notification/send-alert`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(message),
+  });
+};
+
 export const recoveryPasswordByEmail = async (email: string) => {
   try {
     const response = await fetch(
